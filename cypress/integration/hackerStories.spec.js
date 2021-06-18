@@ -1,10 +1,23 @@
 describe('Hacker Stories', () => {
   beforeEach(() => {
-    cy.visit('/')
+    // Criar cy.intercept para intercepitar requisicao
+    // Passou metodo como objeto
+    cy.intercept({
+      method: "GET",
+      pathname: "**/search",
+      query: {
+        query: "React",
+        page: "0",
+      },
+    }).as("getStories");
 
-    cy.assertLoadingIsShownAndHidden()
-    cy.contains('More').should('be.visible')
-  })
+    cy.visit("/");
+    cy.wait("@getStories");
+
+    // cy.assertLoadingIsShownAndHidden() // Verificar que o elemento Node é exibido e logo depois não é mais exibido
+    // cy.contains('More').should('be.visible') // Verifica que o botão de clicar está visivel
+  });
+
 
   it('shows the footer', () => {
     cy.get('footer')
@@ -21,11 +34,21 @@ describe('Hacker Stories', () => {
     it.skip('shows the right data for all rendered stories', () => {})
 
     it('shows 20 stories, then the next 20 after clicking "More"', () => {
+      cy.intercept({
+        method: "GET",
+        pathname: "**/search",
+        query: {
+          query: "React",
+          page: "1",
+        },
+      }).as("getNextStories");
+      
       cy.get('.item').should('have.length', 20)
 
       cy.contains('More').click()
+      cy.wait('@getNextStories')
 
-      cy.assertLoadingIsShownAndHidden()
+      // cy.assertLoadingIsShownAndHidden()
 
       cy.get('.item').should('have.length', 40)
     })
@@ -68,15 +91,21 @@ describe('Hacker Stories', () => {
     const newTerm = 'Cypress'
 
     beforeEach(() => {
+      cy.intercept (
+        'GET',
+        `**/search?query=${newTerm}&page=0`
+      ).as('getNewTermStories')
+
       cy.get('#search')
         .clear()
     })
 
     it('types and hits ENTER', () => {
+      
       cy.get('#search')
         .type(`${newTerm}{enter}`)
-
-      cy.assertLoadingIsShownAndHidden()
+      
+        cy.wait('@getNewTermStories')
 
       cy.get('.item').should('have.length', 20)
       cy.get('.item')
@@ -92,7 +121,7 @@ describe('Hacker Stories', () => {
       cy.contains('Submit')
         .click()
 
-      cy.assertLoadingIsShownAndHidden()
+      cy.wait('@getNewTermStories')
 
       cy.get('.item').should('have.length', 20)
       cy.get('.item')
@@ -101,19 +130,28 @@ describe('Hacker Stories', () => {
       cy.get(`button:contains(${initialTerm})`)
         .should('be.visible')
     })
+    // it.only('types and submits the form directly', () => {
+    //   cy.get('#search')
+    //   .type(newTerm)        
+    //   cy.get('form').submit()
+
+    //   cy.wait('@getNewTermStories')
+
+    //   cy.get('.item').should('have.length', 20)
+    //  })
 
     context('Last searches', () => {
       it('searches via the last searched term', () => {
         cy.get('#search')
-          .type(`${newTerm}{enter}`)
+          .type(`${newTerm}{enter}`) // Fazer uma busca apertando enter
 
-        cy.assertLoadingIsShownAndHidden()
+          cy.wait('@getNewTermStories') // Aguardar a requisição ser concluida
 
         cy.get(`button:contains(${initialTerm})`)
           .should('be.visible')
-          .click()
+          .click() // Verificar que o botão tem o texto do termo inicial e estando visivel para ser clicavel
 
-        cy.assertLoadingIsShownAndHidden()
+        cy.wait('@getStories') //Aguardar requisição do termo inicial
 
         cy.get('.item').should('have.length', 20)
         cy.get('.item')
@@ -126,17 +164,23 @@ describe('Hacker Stories', () => {
       it('shows a max of 5 buttons for the last searched terms', () => {
         const faker = require('faker')
 
-        Cypress._.times(6, () => {
+        cy.intercept (
+          'GET',
+          '**/search**'
+        ).as('getRandomStories')
+
+        Cypress._.times(6, () => { //Low Dash 
           cy.get('#search')
             .clear()
             .type(`${faker.random.word()}{enter}`)
+          cy.wait('@getRandomStories')
         })
 
-        cy.assertLoadingIsShownAndHidden()
+        // cy.assertLoadingIsShownAndHidden()
 
         cy.get('.last-searches button')
           .should('have.length', 5)
-      })
+      })      
     })
   })
 })
